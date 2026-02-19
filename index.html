@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>WordBaba Ultra</title>
+
+<style>
+body{
+margin:0;
+font-family:Arial;
+color:white;
+text-align:center;
+background:linear-gradient(-45deg,#141E30,#243B55,#0f2027,#203a43);
+background-size:400% 400%;
+animation:gradientMove 15s ease infinite;
+}
+@keyframes gradientMove{
+0%{background-position:0% 50%;}
+50%{background-position:100% 50%;}
+100%{background-position:0% 50%;}
+}
+.card{
+background:#111;
+padding:20px;
+border-radius:15px;
+width:420px;
+margin:20px auto;
+box-shadow:0 0 25px rgba(0,255,255,0.4);
+}
+button{
+padding:10px 20px;
+margin:6px;
+border:none;
+border-radius:8px;
+cursor:pointer;
+font-weight:bold;
+background:#00ffff;
+color:black;
+}
+input{
+padding:10px;
+margin:8px;
+border-radius:8px;
+border:none;
+width:220px;
+}
+#xpBar{width:100%;height:12px;background:#333;border-radius:10px;margin-top:6px;}
+#xpFill{height:12px;background:lime;width:0%;border-radius:10px;transition:0.3s;}
+#timerBar{height:8px;background:red;width:100%;margin-top:6px;transition:1s linear;}
+.overlay{
+position:fixed;
+top:0;left:0;
+width:100%;height:100%;
+background:rgba(0,0,0,0.92);
+display:flex;
+justify-content:center;
+align-items:center;
+flex-direction:column;
+z-index:3000;
+}
+
+/* GİRİŞ STİL */
+.login-box{
+background:rgba(0,0,0,0.7);
+padding:40px;
+border-radius:15px;
+box-shadow:0 0 20px #00f2ff;
+}
+</style>
+</head>
+<body>
+
+<h1>WordBaba Ultra <button onclick="openSettings()">⚙️</button></h1>
+
+<!-- GİRİŞ -->
+<div id="loginScreen" class="overlay">
+<div class="login-box">
+<h2>Giriş / Kayıt</h2>
+<input type="text" id="usernameInput" placeholder="Kullanıcı Adı"><br>
+<input type="password" id="passwordInput" placeholder="Şifre"><br>
+<button onclick="registerUser()">Kayıt</button>
+<button onclick="loginUser()">Giriş</button>
+</div>
+</div>
+
+<div id="game">
+<div class="card">
+Seviye: <span id="levelText">1</span> |
+Can: <span id="lifeText">3</span> |
+XP: <span id="xpText">0</span> |
+Coin: <span id="coinText">0</span> |
+Rekor: <span id="highScoreText">0</span> |
+Combo: <span id="comboText">0</span> |
+Süre: <span id="timeText">60</span>
+<div id="xpBar"><div id="xpFill"></div></div>
+<div id="timerBar"></div>
+</div>
+
+<div class="card">
+<h2 id="question"></h2>
+<div id="answers"></div>
+</div>
+</div>
+
+<div id="gameOver" class="overlay" style="display:none;">
+<h1>OYUN BİTTİ</h1>
+<p>Seviye: <span id="finalLevel"></span></p>
+<p>Coin: <span id="finalCoin"></span></p>
+<p>Toplam Skor: <span id="finalScore"></span></p>
+<button onclick="restartGame()">Yeniden Başla</button>
+</div>
+
+<div id="settingsBox" class="overlay" style="display:none;">
+<h2>Ayarlar</h2>
+<p><b>Oyun Modu</b></p>
+<button onclick="setMode(false)">Normal Mod</button>
+<button onclick="setMode(true)">Zamanlı Mod</button>
+<p><b>Süre</b></p>
+<button onclick="changeTime(60)">60sn</button>
+<button onclick="changeTime(90)">90sn</button>
+<button onclick="changeTime(120)">120sn</button>
+<p><b>Ses</b></p>
+<button onclick="toggleSound()">Ses Aç/Kapat</button>
+<br><br>
+<button onclick="closeSettings()">Kapat</button>
+</div>
+
+<script>
+
+let words=[
+{tr:"kedi",en:"cat"},{tr:"köpek",en:"dog"},
+{tr:"ev",en:"house"},{tr:"araba",en:"car"},
+{tr:"su",en:"water"},{tr:"okul",en:"school"},
+{tr:"kitap",en:"book"},{tr:"masa",en:"table"},
+{tr:"güneş",en:"sun"},{tr:"ay",en:"moon"},
+{tr:"yıldız",en:"star"},{tr:"elma",en:"apple"},
+{tr:"muz",en:"banana"},{tr:"anne",en:"mother"},
+{tr:"baba",en:"father"},{tr:"arkadaş",en:"friend"}
+];
+
+let level=1,life=3,xp=0,coin=0,combo=0,correctAnswer="";
+let timedMode=false;
+let timeLeft=60;
+let gameTime=60;
+let timerInterval=null;
+let soundOn=true;
+let highScore=localStorage.getItem("wordbabaHighScore")||0;
+
+function registerUser(){
+let u=usernameInput.value;
+let p=passwordInput.value;
+if(u && p){
+localStorage.setItem("wb_user",u);
+localStorage.setItem("wb_pass",p);
+alert("Kayıt başarılı");
+}else{alert("Bilgileri doldur");}
+}
+
+function loginUser(){
+let u=usernameInput.value;
+let p=passwordInput.value;
+if(u===localStorage.getItem("wb_user") && p===localStorage.getItem("wb_pass")){
+loginScreen.style.display="none";
+resetStats();
+newQuestion();
+updateUI();
+}else{alert("Hatalı giriş");}
+}
+
+function xpNeed(){return 10+(level*2);}
+
+function resetStats(){
+clearInterval(timerInterval);
+level=1;life=3;xp=0;coin=0;combo=0;
+timeLeft=gameTime;
+updateUI();
+timerBar.style.width="100%";
+}
+
+function setMode(mode){timedMode=mode;resetStats();}
+function changeTime(t){gameTime=t;resetStats();}
+function toggleSound(){soundOn=!soundOn;}
+function openSettings(){settingsBox.style.display="flex";}
+function closeSettings(){settingsBox.style.display="none";}
+
+function startTimer(){
+clearInterval(timerInterval);
+timerInterval=setInterval(()=>{
+timeLeft--;
+if(timeLeft<0) timeLeft=0;
+updateUI();
+timerBar.style.width=(timeLeft/gameTime*100)+"%";
+if(timeLeft<=0) endGame();
+},1000);
+}
+
+function newQuestion(){
+let r=words[Math.floor(Math.random()*words.length)];
+correctAnswer=r.en;
+question.innerText=r.tr;
+answers.innerHTML="";
+let options=[correctAnswer];
+while(options.length<4){
+let w=words[Math.floor(Math.random()*words.length)].en;
+if(!options.includes(w)) options.push(w);
+}
+options.sort(()=>Math.random()-0.5);
+options.forEach(opt=>{
+let b=document.createElement("button");
+b.innerText=opt;
+b.onclick=()=>checkAnswer(opt);
+answers.appendChild(b);
+});
+}
+
+function checkAnswer(opt){
+if(opt===correctAnswer){
+combo++;xp++;coin+=5;
+if(combo>=3) coin+=10;
+if(xp>=xpNeed()){
+level++;xp=0;
+if(timedMode){
+if(!timerInterval) startTimer();
+if(timeLeft>5) timeLeft-=2;
+}
+}
+}else{
+combo=0;life--;
+if(life<=0){endGame();return;}
+}
+updateUI();
+newQuestion();
+}
+
+function updateUI(){
+levelText.innerText=level;
+lifeText.innerText=life;
+xpText.innerText=xp+"/"+xpNeed();
+coinText.innerText=coin;
+comboText.innerText=combo;
+timeText.innerText=timeLeft;
+highScoreText.innerText=highScore;
+xpFill.style.width=(xp/xpNeed()*100)+"%";
+}
+
+function endGame(){
+clearInterval(timerInterval);
+let totalScore=(level*10)+(coin)+(combo*5);
+if(totalScore>highScore){
+highScore=totalScore;
+localStorage.setItem("wordbabaHighScore",highScore);
+}
+finalLevel.innerText=level;
+finalCoin.innerText=coin;
+finalScore.innerText=totalScore;
+gameOver.style.display="flex";
+}
+
+function restartGame(){
+resetStats();
+gameOver.style.display="none";
+loginScreen.style.display="flex";
+}
+
+</script>
+</body>
+</html>
